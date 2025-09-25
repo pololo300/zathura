@@ -1,0 +1,52 @@
+name: Release AppImage
+
+on:
+  release:
+    types: [published]
+
+env:
+  VERBOSE: 1
+
+
+jobs:
+  build-x86_64:
+    name: Build AppImage for x86_64
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/pwmt/github-actions-debian:trixie
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: build zathura
+        run: |
+          meson setup build --prefix="${PWD}"/AppDir/usr
+          cd build
+          ninja
+          ninja install
+          ninja test --verbose
+          cd ..
+
+      - name: get linuxdeploy 
+        run: |
+          apt-get update
+          apt-get install wget file
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-appimage/releases/download/continuous/linuxdeploy-plugin-appimage-x86_64.AppImage
+          chmod +x linuxdeploy-*.AppImage
+
+      - name: build AppImage
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+          LD_LIBRARY_PATH: "AppDir/usr/lib64"
+          NO_STRIP: "1"
+        run: |
+          ./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AppImage
+          path: ./Zathura-x86_64.AppImage
